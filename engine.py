@@ -1,91 +1,96 @@
 import pandas as pd
 import numpy as np
+import statsmodels.api as sm
 
-class PricingEngine:
+class StrategicPricingEngine:
     """
-    Retail Strategy Tool: Promotional Lift & Pricing Optimizer
-    Simplified version for transparent business logic.
+    Advanced Retail Analytics Suite: Promotional Lift & Price Elasticity
+    Integrates regression-based elasticity modeling with margin simulation.
     """
 
     def __init__(self, data_path='data/train.csv', meta_path='data/store.csv'):
-        # 1. Load data
+        # 1. Ingest scanner data and store metadata
         train = pd.read_csv(data_path, low_memory=False)
         meta = pd.read_csv(meta_path)
         
-        # 2. Merge and clean
+        # 2. Merge and pre-process for temporal analysis
         self.df = pd.merge(train, meta, on='Store')
         self.df['Date'] = pd.to_datetime(self.df['Date'])
         self.df = self.df[(self.df['Open'] == 1) & (self.df['Sales'] > 0)]
 
-    def get_promo_impact(self):
+    def analyze_promo_lift(self):
         """
-        Calculates how much 'Extra' sales we get from a promotion.
-        Logic: Compare Promo days to Non-Promo days.
+        Quantifies the incremental impact of trade promotions.
+        Uses a Day-of-Week adjusted baseline to isolate organic demand.
         """
-        # Average sales when there is NO promo
-        avg_normal_sales = self.df[self.df['Promo'] == 0]['Sales'].mean()
+        # Baseline = mean sales per DayOfWeek during non-promo periods
+        baseline = self.df[self.df['Promo'] == 0].groupby('DayOfWeek')['Sales'].mean()
         
-        # Average sales when there IS a promo
-        avg_promo_sales = self.df[self.df['Promo'] == 1]['Sales'].mean()
+        promo_days = self.df[self.df['Promo'] == 1].copy()
+        promo_days['expected'] = promo_days['DayOfWeek'].map(baseline)
         
-        lift = (avg_promo_sales / avg_normal_sales - 1) * 100
-        return round(lift, 1)
+        lift = (promo_days['Sales'].sum() / promo_days['expected'].sum() - 1) * 100
+        return round(lift, 2)
 
-    def calculate_elasticity(self):
+    def model_price_elasticity(self, store_id=1):
         """
-        Measures Price Sensitivity.
-        Logic: If we drop price by 20%, by what % does volume go up?
+        Estimates elasticity using a Regression-based approach.
+        We use a Log-Log OLS model to capture constant price elasticity.
+        Interpretation: The coefficient 'Beta' represents the % volume change 
+        for a 1% price change.
         """
-        # We assume Promo is a 20% discount (Price goes from 1.0 to 0.8)
-        price_change = -0.20 
+        subset = self.df[self.df['Store'] == store_id].copy()
         
-        # Calculate volume change
-        normal_vol = self.df[self.df['Promo'] == 0]['Sales'].mean()
-        promo_vol = self.df[self.df['Promo'] == 1]['Sales'].mean()
-        volume_change = (promo_vol / normal_vol - 1)
+        # Feature Engineering: Price proxy (Promo=1 implies 20% discount architecture)
+        subset['price_index'] = np.where(subset['Promo'] == 1, 0.8, 1.0)
         
-        # Elasticity = % Change in Volume / % Change in Price
-        self.elasticity = volume_change / price_change
-        return round(self.elasticity, 2)
+        # Log Transformations for Elasticity Modeling
+        log_q = np.log(subset['Sales'])
+        log_p = np.log(subset['price_index'])
+        
+        # Statistical Regression: Log(Quantity) ~ Log(Price) + Seasonality(DayOfWeek)
+        # Adding DayOfWeek controls for weekly fluctuations
+        X = sm.add_constant(pd.concat([log_p, subset['DayOfWeek']], axis=1))
+        model = sm.OLS(log_q, X).fit()
+        
+        # Extract the coefficient for the price variable
+        self.elasticity = model.params.iloc[1]
+        return round(self.elasticity, 4)
 
-    def find_best_price(self, unit_cost=6.0):
+    def optimize_price_architecture(self, unit_cost=6.0, base_price=10.0):
         """
-        Finds the most profitable price point.
-        Logic: Test different prices and see which one makes the most money.
+        Identifies the optimal price point to maximize margin.
+        Uses a simulation-based grid search over the predicted demand curve.
         """
         if not hasattr(self, 'elasticity'):
-            self.calculate_elasticity()
+            self.model_price_elasticity()
 
-        base_price = 10.0
         base_volume = self.df[self.df['Promo'] == 0]['Sales'].mean()
         
-        best_profit = 0
-        best_price = 0
+        simulation_results = []
         
-        # TEST EVERY PRICE from £7.00 to £13.00 (in 10p steps)
-        for test_price in np.arange(7.0, 13.0, 0.1):
-            # 1. Predict how many we will sell at this price
+        # Scenario Modeling: Test price points from -30% to +30% of base
+        for test_price in np.arange(base_price * 0.7, base_price * 1.3, 0.1):
+            # 1. Predict volume using the derived elasticity coefficient
             price_ratio = test_price / base_price
-            # Volume formula: V = V0 * (1 + elasticity * %PriceChange)
-            # (Simplified linear version for easy explanation)
-            pct_change_in_price = (test_price - base_price) / base_price
-            predicted_volume = base_volume * (1 + self.elasticity * pct_change_in_price)
+            predicted_volume = base_volume * (price_ratio ** self.elasticity)
             
-            # 2. Calculate Profit
+            # 2. Calculate Profitability
             margin = test_price - unit_cost
-            current_profit = predicted_volume * margin
+            total_profit = predicted_volume * margin
             
-            # 3. Keep track of the winner
-            if current_profit > best_profit:
-                best_profit = current_profit
-                best_price = test_price
-                
-        return round(best_price, 2)
+            simulation_results.append({'price': test_price, 'profit': total_profit})
+            
+        # Select the price point that maximizes total margin
+        best_scenario = max(simulation_results, key=lambda x: x['profit'])
+        return {
+            "optimal_price": round(best_scenario['price'], 2),
+            "elasticity_coefficient": round(self.elasticity, 4)
+        }
 
 if __name__ == "__main__":
-    engine = PricingEngine()
-    print(f"1. Promo Lift: {engine.get_promo_impact()}%")
-    print(f"2. Price Sensitivity: {engine.calculate_elasticity()}")
-    print(f"3. Optimal Price Point: £{engine.find_best_price()}")
-    print("\nExplain this: 'I analyzed historical data to find that customers are very sensitive to price (Elasticity).")
-    print("I then simulated 60 different price points to find the one that maximizes our total margin.'")
+    engine = StrategicPricingEngine()
+    print(f"I. Promotional Lift (DOW-Adjusted): {engine.analyze_promo_lift()}%")
+    print(f"II. Price Elasticity (Regression-Based): {engine.model_price_elasticity()}")
+    opt = engine.optimize_price_architecture()
+    print(f"III. Recommended Price: £{opt['optimal_price']}")

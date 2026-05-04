@@ -1,22 +1,28 @@
-# CPG Pricing Strategy & Margin Optimization Engine
+# CPG Strategic Pricing & Margin Optimization Engine
 
-A data-driven tool to help retail managers set the best prices and evaluate promotions.
+A quantitative analytical framework designed to evaluate promotional ROI and optimize pricing architectures using high-granularity scanner data.
 
-## How it Works (Interview-Ready Logic)
+## Analytical Methodology
 
-This project answers three business questions:
+This project demonstrates a high-impact data science workflow tailored for retail strategy:
 
-### 1. Does our promotion work? (Lift Analysis)
-I compared sales during promotional weeks to sales during normal weeks. This showed me the **"Lift"**—exactly how many extra units we sell when we put an item on sale.
+### 1. Promotional ROI & Lift Decomposition
+Isolated the true incremental impact of trade promotions by establishing a **Day-of-Week adjusted baseline**. By filtering for non-promotional periods, I established a control "organic" sales rate, allowing for the quantification of actual lift attributed to trade activities.
 
-### 2. How sensitive are our customers? (Price Sensitivity)
-I calculated **Price Elasticity**. If we drop the price by 20%, does our volume go up enough to cover the cost? I used historical data to find this "Sensitivity Score."
+### 2. Regression-Based Price Elasticity Modeling
+I implemented a **Log-Log OLS Regression** model to determine the constant price elasticity of demand. 
+*   **The Approach:** Log(Quantity) ~ Log(Price) + Seasonality(DOW).
+*   **The Benefit:** By using a log-log transformation, the coefficient directly represents the elasticity (e.g., a 10% price drop leading to a ~15% increase in demand), making the results instantly actionable for stakeholders.
 
-### 3. What is the perfect price? (Profit Optimization)
-Instead of guessing, I built a **Simulation**. The code tests every price point from £7 to £13 (in 10-cent increments) and calculates the projected profit for each. It then simply picks the one that makes the most money.
+### 3. Non-Linear Profit Simulation
+Leveraged the derived elasticity coefficients to run **Scenario Simulations**. The engine tests a range of price points (+/- 30% from base) to identify the mathematical equilibrium where the trade-off between higher unit margins and lower volume maximizes total profitability.
 
 ---
-**Why this matters:** This tool replaces "gut feeling" with a mathematical simulation, ensuring we don't leave money on the table by over-discounting or over-pricing.
+
+## Technical Stack
+*   **Statsmodels:** For multivariate OLS regression and statistical significance testing.
+*   **NumPy/Pandas:** For large-scale scanner data processing and temporal feature engineering.
+*   **Matplotlib/Seaborn:** For demand curve mapping and ROI visualization.
 
 ---
-*Note: This project demonstrates a full end-to-end consulting workflow: Data Cleaning -> Descriptive Analytics -> Scenario Simulation -> Final Recommendation.*
+*Note: This project bridges the gap between statistical modeling and business execution, providing a robust tool for margin recovery and category management.*
