@@ -37,39 +37,68 @@ class StrategicPricingEngine:
         }
 
     def estimate_price_elasticity(self, store_id=1):
-        """Computes price elasticity using a constant-elasticity log-log model."""
+        """
+        Calculates Price Elasticity of Demand.
+        
+        Logic for interview:
+        We look at how much sales (Quantity) change when the Price changes.
+        In a 'Log-Log' model, the result tells us the % change in volume 
+        for every 1% change in price.
+        """
         store_data = self.df[self.df['Store'] == store_id].copy()
         
-        # Proxy price architecture: 20% promotional discount depth
+        # We assume a 20% discount during promotional periods
         store_data['price_index'] = np.where(store_data['Promo'] == 1, 0.8, 1.0)
         
-        log_q = np.log(store_data['Sales'])
-        log_p = np.log(store_data['price_index'])
+        # Transform data to logarithms
+        log_quantity = np.log(store_data['Sales'])
+        log_price = np.log(store_data['price_index'])
         
-        # OLS regression where the coefficient is the direct elasticity
-        X = sm.add_constant(log_p)
-        model = sm.OLS(log_q, X).fit()
+        # Build the statistical model
+        X_variables = sm.add_constant(log_price)
+        regression_model = sm.OLS(log_quantity, X_variables).fit()
         
-        self.elasticity = model.params.iloc[1]
+        # The 'Elasticity' is the coefficient of the price variable
+        self.elasticity = regression_model.params.iloc[1]
         return round(self.elasticity, 4)
 
-    def optimize_margin(self, unit_cost_ratio=0.6, base_price=1.0):
-        """Identifies the profit-maximizing price point based on volume sensitivity."""
+    def optimize_margin(self, unit_cost_ratio=0.6, base_price=10.0):
+        """
+        Finds the price point that maximizes total profit.
+        
+        Logic for interview: 
+        1. We predict volume based on the price.
+        2. Profit = (Price - Cost) * Volume.
+        3. We use an optimizer to find the price where Profit is highest.
+        """
         if not hasattr(self, 'elasticity'):
             self.estimate_price_elasticity()
 
-        # Profit = [k * P^e] * [P - Cost]
-        def _profit(p):
-            predicted_volume = (p / base_price) ** self.elasticity
-            margin = p - (base_price * unit_cost_ratio)
-            return -(predicted_volume * margin)
+        unit_cost = base_price * unit_cost_ratio
+
+        def calculate_negative_profit(current_price):
+            # Step A: How much volume will we sell at this price?
+            # Ratio of new price to old price
+            price_ratio = current_price / base_price
+            # Volume change based on elasticity
+            volume_factor = price_ratio ** self.elasticity
+            
+            # Step B: What is our margin per unit?
+            margin_per_unit = current_price - unit_cost
+            
+            # Step C: Total Profit
+            total_profit = volume_factor * margin_per_unit
+            
+            # We return negative because the 'minimize' tool looks for the lowest value
+            return -total_profit
 
         # Optimization constrained to +/- 30% of current base price
-        res = minimize(_profit, x0=base_price, bounds=[(base_price * 0.7, base_price * 1.3)])
+        search_range = [(base_price * 0.7, base_price * 1.3)]
+        result = minimize(calculate_negative_profit, x0=base_price, bounds=search_range)
         
         return {
-            "optimal_price_index": round(res.x[0], 3),
-            "projected_margin_improvement": round(-res.fun, 4)
+            "optimal_price": round(result.x[0], 2),
+            "margin_impact": round(-result.fun, 4)
         }
 
 if __name__ == "__main__":
