@@ -39,4 +39,4 @@ The following charts illustrate the engine's output for a sample category:
 *   **Matplotlib/Seaborn:** For demand curve mapping and ROI visualization.
 
 ---
-*Note: This project bridges the gap between statistical modeling and business execution, providing a robust tool for margin recovery and category management.*
+
