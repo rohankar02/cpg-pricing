@@ -51,5 +51,24 @@ This engine provides a robust framework for quantifying promotional effectivenes
 
 The engine utilizes a log-log regression framework where $\log(Sales) = \beta_0 + \beta_1 \cdot \log(Price) + \dots$. The coefficient $\beta_1$ directly represents the price elasticity of demand. Optimization is performed using the L-BFGS-B algorithm to handle constrained price boundaries.
 
+## Interview Talking Points (Resume Guide)
+
+If you are explaining this project in an interview or on your resume, here is the breakdown of the logic:
+
+### 1. Promotional Lift Analysis
+* **The Problem:** How do we know if a 20% discount is actually "worth it"?
+* **The Solution:** I established a **Baseline Sales** model by averaging sales on non-promo days (segmented by Day of Week). I then calculated the **Incremental Volume** by comparing actual promo sales against this baseline.
+* **Key Metric:** *Promotional Lift %* (Total Promo Sales / Baseline Expected).
+
+### 2. Price Elasticity Modeling
+* **The Logic:** I implemented a **Log-Log Regression** model. In economics, the coefficient of a log-log model represents **constant elasticity**.
+* **Interpretation:** If the elasticity is -2.5, it means for every 1% increase in price, volume drops by 2.5%. This is the foundation for any pricing strategy.
+* **Feature Engineering:** Since unit prices weren't direct, I created a price proxy by mapping the Promo flag to a 20% discount depth.
+
+### 3. Price Optimization
+* **The Objective:** Maximizing total profit, not just volume.
+* **The Methodology:** I built a profit function: $Profit = [Volume(P)] \times [Price - Cost]$.
+* **Optimization:** I used `scipy.optimize.minimize` to solve for the price point that balances the trade-off between higher margins per unit and lower total volume.
+
 ---
-*Note: This system is designed for professional retail analytics and requires high-granularity scanner data for optimal performance.*
+*Note: This structure demonstrates a full end-to-end data science workflow: Data Cleaning -> Descriptive Analytics -> Statistical Modeling -> Business Optimization.*
