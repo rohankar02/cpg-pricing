@@ -1,31 +1,22 @@
 # CPG Pricing Strategy & Margin Optimization Engine
 
-A quantitative framework developed to analyze promotional effectiveness and optimize retail pricing architectures using high-granularity scanner data. This tool integrates econometric modeling with non-linear optimization to balance the trade-off between volume lift and margin erosion.
+A data-driven tool to help retail managers set the best prices and evaluate promotions.
 
-## Executive Summary
+## How it Works (Interview-Ready Logic)
 
-The retail sector faces significant margin pressure due to over-promotion and suboptimal pricing. This project provides a data-driven approach to:
-1.  **Quantify Promotional ROI:** Isolating the true incremental lift from trade promotions by establishing accurate sales baselines.
-2.  **Model Price Sensitivity:** Determining the constant elasticity of demand across store segments using log-log regression.
-3.  **Optimize Margin:** Identifying the mathematical equilibrium between price points and quantity demanded to maximize total profitability.
+This project answers three business questions:
 
-## Methodology
+### 1. Does our promotion work? (Lift Analysis)
+I compared sales during promotional weeks to sales during normal weeks. This showed me the **"Lift"**—exactly how many extra units we sell when we put an item on sale.
 
-### 1. Promotional Lift Decomposition
-Incremental volume is isolated using a day-of-week adjusted baseline model. By filtering for non-promotional periods, we establish a control "organic" sales rate, allowing for the quantification of the actual lift attributed to trade activities.
+### 2. How sensitive are our customers? (Price Sensitivity)
+I calculated **Price Elasticity**. If we drop the price by 20%, does our volume go up enough to cover the cost? I used historical data to find this "Sensitivity Score."
 
-### 2. Econometric Elasticity Modeling
-We utilize a constant-elasticity model where $\log(Q) = \alpha + \beta \log(P) + \epsilon$. The coefficient $\beta$ represents the price elasticity of demand, providing a robust metric for consumer price sensitivity that is comparable across categories and store formats.
-
-### 3. Non-Linear Margin Optimization
-The objective function maximizes total profit:
-$$\text{Profit} = V_0 \left(\frac{P_{new}}{P_{base}}\right)^\beta \times (P_{new} - \text{Cost})$$
-We employ the L-BFGS-B algorithm to solve for the price point that maximizes this function within operationally feasible boundaries (+/- 30% price depth).
-
-## Key Components
-
-*   `engine.py`: The core analytical engine containing the preprocessing pipeline, econometric models, and optimization solver.
-*   `data/`: Retail scanner data (Rossmann Store Sales) including historical sales, promo flags, and store metadata.
+### 3. What is the perfect price? (Profit Optimization)
+Instead of guessing, I built a **Simulation**. The code tests every price point from £7 to £13 (in 10-cent increments) and calculates the projected profit for each. It then simply picks the one that makes the most money.
 
 ---
-**Technical Note:** This engine is built using Python, Scipy, and Statsmodels. It assumes a constant elasticity of demand within the local price range and utilizes DOW-seasonality adjustments for baseline estimation.
+**Why this matters:** This tool replaces "gut feeling" with a mathematical simulation, ensuring we don't leave money on the table by over-discounting or over-pricing.
+
+---
+*Note: This project demonstrates a full end-to-end consulting workflow: Data Cleaning -> Descriptive Analytics -> Scenario Simulation -> Final Recommendation.*

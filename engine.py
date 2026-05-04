@@ -1,108 +1,91 @@
 import pandas as pd
 import numpy as np
-from scipy.optimize import minimize
-import statsmodels.api as sm
 
-class StrategicPricingEngine:
+class PricingEngine:
     """
-    CPG Pricing Engine for Promotional Lift & Elasticity Optimization.
-    Developed for retail category management and margin optimization.
+    Retail Strategy Tool: Promotional Lift & Pricing Optimizer
+    Simplified version for transparent business logic.
     """
 
-    def __init__(self, scanner_data='data/train.csv', store_metadata='data/store.csv'):
-        self.raw = pd.read_csv(scanner_data, low_memory=False)
-        self.meta = pd.read_csv(store_metadata)
-        self.df = self._preprocess(self.raw, self.meta)
-
-    def _preprocess(self, raw, meta):
-        df = pd.merge(raw, meta, on='Store')
-        df['Date'] = pd.to_datetime(df['Date'])
-        # Filter for operational days and valid transaction records
-        return df[(df['Open'] == 1) & (df['Sales'] > 0)].copy()
-
-    def get_promotional_lift(self):
-        """Quantifies incremental volume driven by trade promotions."""
-        # Baseline sales established via non-promo period mean (DOW-adjusted)
-        baseline = self.df[self.df['Promo'] == 0].groupby('DayOfWeek')['Sales'].mean()
+    def __init__(self, data_path='data/train.csv', meta_path='data/store.csv'):
+        # 1. Load data
+        train = pd.read_csv(data_path, low_memory=False)
+        meta = pd.read_csv(meta_path)
         
-        promo_days = self.df[self.df['Promo'] == 1].copy()
-        promo_days['expected'] = promo_days['DayOfWeek'].map(baseline)
-        
-        incremental_units = promo_days['Sales'].sum() - promo_days['expected'].sum()
-        lift_factor = (promo_days['Sales'].sum() / promo_days['expected'].sum()) - 1
-        
-        return {
-            "incremental_volume": int(incremental_units),
-            "lift_percent": round(lift_factor * 100, 2)
-        }
+        # 2. Merge and clean
+        self.df = pd.merge(train, meta, on='Store')
+        self.df['Date'] = pd.to_datetime(self.df['Date'])
+        self.df = self.df[(self.df['Open'] == 1) & (self.df['Sales'] > 0)]
 
-    def estimate_price_elasticity(self, store_id=1):
+    def get_promo_impact(self):
         """
-        Calculates Price Elasticity of Demand.
-        
-        Logic for interview:
-        We look at how much sales (Quantity) change when the Price changes.
-        In a 'Log-Log' model, the result tells us the % change in volume 
-        for every 1% change in price.
+        Calculates how much 'Extra' sales we get from a promotion.
+        Logic: Compare Promo days to Non-Promo days.
         """
-        store_data = self.df[self.df['Store'] == store_id].copy()
+        # Average sales when there is NO promo
+        avg_normal_sales = self.df[self.df['Promo'] == 0]['Sales'].mean()
         
-        # We assume a 20% discount during promotional periods
-        store_data['price_index'] = np.where(store_data['Promo'] == 1, 0.8, 1.0)
+        # Average sales when there IS a promo
+        avg_promo_sales = self.df[self.df['Promo'] == 1]['Sales'].mean()
         
-        # Transform data to logarithms
-        log_quantity = np.log(store_data['Sales'])
-        log_price = np.log(store_data['price_index'])
-        
-        # Build the statistical model
-        X_variables = sm.add_constant(log_price)
-        regression_model = sm.OLS(log_quantity, X_variables).fit()
-        
-        # The 'Elasticity' is the coefficient of the price variable
-        self.elasticity = regression_model.params.iloc[1]
-        return round(self.elasticity, 4)
+        lift = (avg_promo_sales / avg_normal_sales - 1) * 100
+        return round(lift, 1)
 
-    def optimize_margin(self, unit_cost_ratio=0.6, base_price=10.0):
+    def calculate_elasticity(self):
         """
-        Finds the price point that maximizes total profit.
+        Measures Price Sensitivity.
+        Logic: If we drop price by 20%, by what % does volume go up?
+        """
+        # We assume Promo is a 20% discount (Price goes from 1.0 to 0.8)
+        price_change = -0.20 
         
-        Logic for interview: 
-        1. We predict volume based on the price.
-        2. Profit = (Price - Cost) * Volume.
-        3. We use an optimizer to find the price where Profit is highest.
+        # Calculate volume change
+        normal_vol = self.df[self.df['Promo'] == 0]['Sales'].mean()
+        promo_vol = self.df[self.df['Promo'] == 1]['Sales'].mean()
+        volume_change = (promo_vol / normal_vol - 1)
+        
+        # Elasticity = % Change in Volume / % Change in Price
+        self.elasticity = volume_change / price_change
+        return round(self.elasticity, 2)
+
+    def find_best_price(self, unit_cost=6.0):
+        """
+        Finds the most profitable price point.
+        Logic: Test different prices and see which one makes the most money.
         """
         if not hasattr(self, 'elasticity'):
-            self.estimate_price_elasticity()
+            self.calculate_elasticity()
 
-        unit_cost = base_price * unit_cost_ratio
-
-        def calculate_negative_profit(current_price):
-            # Step A: How much volume will we sell at this price?
-            # Ratio of new price to old price
-            price_ratio = current_price / base_price
-            # Volume change based on elasticity
-            volume_factor = price_ratio ** self.elasticity
-            
-            # Step B: What is our margin per unit?
-            margin_per_unit = current_price - unit_cost
-            
-            # Step C: Total Profit
-            total_profit = volume_factor * margin_per_unit
-            
-            # We return negative because the 'minimize' tool looks for the lowest value
-            return -total_profit
-
-        # Optimization constrained to +/- 30% of current base price
-        search_range = [(base_price * 0.7, base_price * 1.3)]
-        result = minimize(calculate_negative_profit, x0=base_price, bounds=search_range)
+        base_price = 10.0
+        base_volume = self.df[self.df['Promo'] == 0]['Sales'].mean()
         
-        return {
-            "optimal_price": round(result.x[0], 2),
-            "margin_impact": round(-result.fun, 4)
-        }
+        best_profit = 0
+        best_price = 0
+        
+        # TEST EVERY PRICE from £7.00 to £13.00 (in 10p steps)
+        for test_price in np.arange(7.0, 13.0, 0.1):
+            # 1. Predict how many we will sell at this price
+            price_ratio = test_price / base_price
+            # Volume formula: V = V0 * (1 + elasticity * %PriceChange)
+            # (Simplified linear version for easy explanation)
+            pct_change_in_price = (test_price - base_price) / base_price
+            predicted_volume = base_volume * (1 + self.elasticity * pct_change_in_price)
+            
+            # 2. Calculate Profit
+            margin = test_price - unit_cost
+            current_profit = predicted_volume * margin
+            
+            # 3. Keep track of the winner
+            if current_profit > best_profit:
+                best_profit = current_profit
+                best_price = test_price
+                
+        return round(best_price, 2)
 
 if __name__ == "__main__":
-    engine = StrategicPricingEngine()
-    print(f"Trade Promotion Lift: {engine.get_promotional_lift()['lift_percent']}%")
-    print(f"Price Elasticity (S1): {engine.estimate_price_elasticity()}")
-    print(f"Optimization Index: {engine.optimize_margin()['optimal_price_index']}")
+    engine = PricingEngine()
+    print(f"1. Promo Lift: {engine.get_promo_impact()}%")
+    print(f"2. Price Sensitivity: {engine.calculate_elasticity()}")
+    print(f"3. Optimal Price Point: £{engine.find_best_price()}")
+    print("\nExplain this: 'I analyzed historical data to find that customers are very sensitive to price (Elasticity).")
+    print("I then simulated 60 different price points to find the one that maximizes our total margin.'")
