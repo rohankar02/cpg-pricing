@@ -17,6 +17,20 @@ I implemented a **Log-Log OLS Regression** model to determine the constant price
 ### 3. Non-Linear Profit Simulation
 Leveraged the derived elasticity coefficients to run **Scenario Simulations**. The engine tests a range of price points (+/- 30% from base) to identify the mathematical equilibrium where the trade-off between higher unit margins and lower volume maximizes total profitability.
 
+## Strategic Insights
+
+The following charts illustrate the engine's output for a sample category:
+
+| Demand Sensitivity | Profit Optimization |
+| :---: | :---: |
+| ![Demand Curve](visualizations/demand_curve.png) | ![Profit Optimization](visualizations/profit_optimization.png) |
+| *Visualizing the volume-price trade-off* | *Identifying the mathematical maximum profit* |
+
+| Promotional Lift |
+| :---: |
+| ![Promo Lift](visualizations/promo_lift.png) |
+| *Quantifying incremental trade impact* |
+
 ---
 
 ## Technical Stack
