@@ -44,8 +44,9 @@ class PriceElasticityModel:
         if df.empty:
             return None
             
-        # Independent variables
-        X = df[['log_price', 'Promo', 'DayOfWeek']]
+        # Independent variables - Use log_price and DayOfWeek
+        # Promo is excluded here because log_price is derived from it in this simulation
+        X = df[['log_price', 'DayOfWeek']]
         X = sm.add_constant(X)
         y = df['log_sales']
         

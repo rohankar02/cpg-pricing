@@ -49,7 +49,7 @@ class PromoOptimizer:
             'max_profit': -result.fun
         }
 
-    def run_scenario(self, discount_depth=0.15, frequency_change=0):
+    def run_scenario(self, discount_depth=0.15):
         """
         Runs a specific promo scenario.
         """
@@ -62,3 +62,14 @@ class PromoOptimizer:
             'predicted_volume': predicted_volume,
             'expected_profit': profit
         }
+
+    def run_scenarios(self):
+        """
+        Runs the specific scenarios requested by business.
+        """
+        scenarios = {
+            "Base Case (20% Discount)": self.run_scenario(discount_depth=0.20),
+            "Scenario 1 (15% Discount)": self.run_scenario(discount_depth=0.15),
+            "Scenario 2 (Higher Volume/Lower Discount)": self.run_scenario(discount_depth=0.10)
+        }
+        return scenarios
